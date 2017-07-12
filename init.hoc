@@ -1,0 +1,166 @@
+/* --------------------------------------------------------
+
+		  init.hoc file for smaller BGnet model
+
+-------------------------------------------------------- */
+
+
+//  Load the GUI and standard run libraries ---------------
+{load_file("nrngui.hoc")}
+
+hmodelstate = 1 // 0 for MPTP, 1 for normal
+if (hmodelstate == 0) {
+	print "Model state: MPTP"
+}
+if (hmodelstate == 1) {
+	print "Model state: normal"
+}
+
+// --------------------------------------------------------
+create acell_home_
+access acell_home_
+
+celsius=33
+dt=0.05
+steps_per_ms=20
+tstop=1000
+v_init=-58
+
+
+objref pnm // Object for ParallelContext()
+
+// Load some other necessary files ------------------------
+{load_file("hoc/setup_globalvars.hoc")} // Initializes all of the global variables numSTN, numSTNGPi, etc.
+{load_file("hoc/load_parms.hoc")}		// Load the load_parms file to load function to read parameters
+{load_file("hoc/make_cells.hoc")}		// Load the file that creates and connects cells
+{load_file("netparmpi.hoc")}			// For using the ParallelNetManager class
+
+
+// Read parameters, create cells, and connect them --------
+readParms("parms.txt")	// Load parms.txt parameter file
+
+
+// ParallelContext object ---------------------------------
+pnm = new ParallelNetManager(ncell)
+
+
+// Get seedVal from randseed.txt --------------------------
+{objref rf}
+
+{rf = new File("randseed.txt")}
+{rf.ropen()}
+{seedVal = rf.scanvar()}
+{rf.close()}
+
+
+// Create #ncell from parms.txt cells ---------------------
+makecells(ncell) 						// create the cells
+
+
+// Add bias currents to set resting frequencies -----------
+{load_file("hoc/bias_currents.hoc")}
+
+
+// Connect cells together ---------------------------------
+{load_file("hoc/connect_cells.hoc")}
+
+
+// Connect cortical inputs to cells, set model state ------
+{load_file("hoc/cortical_input.hoc")}
+
+
+// Connect DBS stimulation to cells -----------------------
+//{load_file("hoc/dbs_stim.hoc")}
+
+
+// Record supplemental info (spike times, etc.) -----------
+//{load_file("hoc/record.hoc")}
+
+
+// Utilities for gathering spike data and so on -----------
+{load_file("hoc/utilities.hoc")}
+
+
+// --------------------------------------------------------
+objref tvec, idvec
+proc spikerecord() {local i, j, k, rank  localobj nc, nil
+	tvec = new Vector()
+	idvec = new Vector()
+	for rank=0, pnm.pc.nhost-1 {
+		if (rank==pnm.pc.id) {
+			for (i=pnm.pc.id; i < ncell; i += pnm.pc.nhost) {
+				pnm.pc.spike_record(i, tvec, idvec)
+			}
+		}
+	}
+}
+
+// --------------------------------------------------------
+randomize(seedVal)
+
+{pnm.pc.set_maxstep(10)}
+
+//spikerecord()
+pnm.want_all_spikes()
+
+{stdinit()}
+{runtime = startsw()}
+{pnm.pc.psolve(tstop)}
+{runtime = startsw() - runtime}
+
+
+// Recording utilities and setDBS() -----------------------
+{load_file("hoc/configure_data.hoc")}
+
+
+// Update and save seed value -----------------------------
+{rf.wopen("randseed.txt")}
+rf.printf("%d\n", seedVal+1)
+rf.close()
+
+strdef str
+
+netNum = 0
+getOutput("pNets.dat", netNum, 1) // Load a parameter set
+runNum = 0
+
+if (hmodelstate == 0) {
+	setMPTPinput() // Configure data for MPTP state
+	sprint(str, "mptp_spikes%03d_%d.txt", runNum, int(1000/betaClk.iMean))
+}
+if (hmodelstate == 1) {
+	setNORMALinput() // Configure data for normal state
+	sprint(str, "normal_spikes%03d_%d.txt", runNum, int(1000/betaClk.iMean))
+
+}
+
+proc spikeout() {local i, rank  localobj f
+	f = new File()
+	for i=0, pnm.spikevec.size-1 {
+		f.aopen($s1)
+		f.printf("%f\t%f\n", pnm.spikevec.x[i], pnm.idvec.x[i])
+		f.close()
+	}
+}
+
+
+// Print values
+//{load_file("hoc/print_values.hoc")}
+
+
+// Open file, clear the old data, and write new data
+// Necessary due to writing loop above and f.wopen vs. f.aopen
+// Look for better fix
+objref tmpf
+tmpf = new File()
+{tmpf.wopen(str)}
+tmpf.printf("")
+tmpf.close()
+
+spikeout(str)
+
+
+// --------------------------------------------------------
+{pnm.pc.runworker()}
+{pnm.pc.done()}
+//quit()

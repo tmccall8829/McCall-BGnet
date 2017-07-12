@@ -1,0 +1,36 @@
+// Load cell templates
+{load_file("../cells/pSTN_template.hoc")}
+{load_file("../cells/pGPi_template.hoc")}
+{load_file("../cells/pGPeA_template.hoc")}
+
+
+objref cells, nclist
+
+proc makecells() {local i  localobj stn_cell, gpe_cell, gpi_cell, nc, nil
+
+	cells = new List()
+	nclist = new List()
+	for (i=pnm.pc.id; i<$1; i += pnm.pc.nhost) {
+		if (i >= 0 && i < 10) {
+			stn_cell = new pSTN(numCtxSTN, numGPeSTN)
+			cells.append(stn_cell)
+			pnm.pc.set_gid2node(i, pnm.pc.id)
+			nc = stn_cell.connect2target(nil)
+			pnm.pc.cell(i, nc)
+		}
+		if (i >= 10 && i < 40) {
+			gpe_cell = new pGPe(numStrGPe, numSTNGPe, numGPeGPe)
+			cells.append(gpe_cell)
+			pnm.pc.set_gid2node(i, pnm.pc.id)
+			nc = gpe_cell.connect2target(nil)
+			pnm.pc.cell(i, nc)
+		}
+		if (i >= 40 && i < 50) {
+			gpi_cell = new pGPi(numStrGPi, numSTNGPi, numGPeGPi)
+			cells.append(gpi_cell)
+			pnm.pc.set_gid2node(i, pnm.pc.id)
+			nc = gpi_cell.connect2target(nil)
+			pnm.pc.cell(i, nc)
+		}
+	}
+}

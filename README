@@ -1,0 +1,6 @@
+This project is a custom remake of the BGnet model by Hahn and McIntyre. It was
+remade to increase compatibility with the nrntraub model code structure, with
+the end goal of connecting the two together to create a more realistic model of
+the cortico-basal ganglia-thalamocortical loop. This is still a tentative model,
+and should not be assumed to be a fully operational model. It will contain
+errors.

@@ -1,0 +1,243 @@
+//----------------------------------------------------------------------------
+// Initialize global variables
+// ******** USE THIS FILE TO CONNECT TRAUB CORTICAL INPUT? ********
+//----------------------------------------------------------------------------
+
+objref preCtxSTN[numSTN], preStrGPe[numGPe], preStrGPi[numGPi]	//list of input timing objects for each cell
+objref ncCtxSTN, ncStrGPe, ncStrGPi
+
+for (i=pnm.pc.id; i < ncell; i += pnm.pc.nhost) {
+	if (i >= 0 && i < 10 && pnm.pc.gid_exists(i)) {
+		preCtxSTN[i] = new List()
+	}
+	if (i >= 10 && i < 40 && pnm.pc.gid_exists(i)) {
+		preStrGPe[i-10] = new List()
+	}
+	if (i >= 40 && i < 50 && pnm.pc.gid_exists(i)) {
+		preStrGPi[i-40] = new List()
+	}
+}
+
+ncCtxSTN = new List()
+ncStrGPe = new List()
+ncStrGPi = new List()
+
+//-----------------------------------------
+objref betaClk
+
+betaClk = new twoStateGen(.5)
+betaClk.start = 0
+betaClk.iMean = 1000/16		// 16Hz cortical input
+
+
+
+
+//betaClk drives burst mode in twoStateGen that is connected to CtxSTN, StrGPe and StrGPi synapses
+
+
+//----------------------------------------------------------------------------
+// Functions to set up input from current value of global variables
+//----------------------------------------------------------------------------
+
+objref preSyn, nc, nclistINP
+
+nclistINP = new List()
+
+proc INPconnectNet() { local i,j  localobj preSyn, target, syn, nc
+	for (i=pnm.pc.id; i < ncell; i += pnm.pc.nhost) {
+		if (i >= 0 && i < 10 && pnm.pc.gid_exists(i)) {
+			// create cortical connections to STN
+			for j=0, numCtxSTN-1 {
+				preSyn = new twoStateGen(.5)
+				preCtxSTN[i].append(preSyn)
+
+				nc = new NetCon(betaClk, preSyn)
+				nc.weight = 1
+				nc.delay = 0
+				nclistINP.append(nc)
+
+				target = pnm.pc.gid2cell(i)
+				syn = target.stn_synlist.o(j)
+				nc = new NetCon(preSyn, syn)
+				nc.weight = gDA_CtxSTN*gmaxCtxSTN/numCtxSTN
+				nc.delay = delCtxSTN
+				nclistINP.append(nc)
+				ncCtxSTN.append(nc)
+			}
+		}
+		if (i >= 10 && i < 40 && pnm.pc.gid_exists(i)) {
+			// create cortical connections to GPe
+			for j=0, numStrGPe-1 {
+				preSyn = new twoStateGen(.5)
+				preStrGPe[i-10].append(preSyn)
+
+				nc = new NetCon(betaClk, preSyn)
+				nc.weight = 1
+				nc.delay = 0
+				nclistINP.append(nc)
+
+				target = pnm.pc.gid2cell(i)
+				syn = target.gpe_synlist.o(j)
+				nc = new NetCon(preSyn, syn)
+				nc.weight = gDA_StrGPe*gmaxStrGPe/numStrGPe
+				nc.delay = delStrGPe
+				nclistINP.append(nc)
+				ncStrGPe.append(nc)
+			}
+		}
+		if (i >= 40 && i < 50 && pnm.pc.gid_exists(i)) {
+			// create cortical connections to GPi
+			for j=0, numStrGPi-1 {
+				preSyn = new twoStateGen(.5)
+				preStrGPi[i-40].append(preSyn)
+
+				nc = new NetCon(betaClk, preSyn)
+				nc.weight = 1
+				nc.delay = 0
+				nclistINP.append(nc)
+
+				target = pnm.pc.gid2cell(i)
+				syn = target.gpi_synlist.o(j)
+				nc = new NetCon(preSyn, syn)
+				nc.weight = gDA_StrGPi*gmaxStrGPi/numStrGPi
+				nc.delay = delStrGPi
+				nclistINP.append(nc)
+				ncStrGPi.append(nc)
+			}
+		}
+	}
+}
+
+//----------------------------------------------------------------------------
+proc INPupdateWeights() { local i,j, k
+	for (i=pnm.pc.id; i < ncell; i += pnm.pc.nhost) {
+		if (i >= 0 && i < 10 && pnm.pc.gid_exists(i)) {
+			// update weights
+			for j=0, numCtxSTN-1 {
+				preCtxSTN[i].o(j).iMean = imnCtxSTN
+				preCtxSTN[i].o(j).iStd = isdCtxSTN
+				preCtxSTN[i].o(j).bMean = bmnCtxSTN
+				preCtxSTN[i].o(j).bStd = bsdCtxSTN
+				preCtxSTN[i].o(j).bDurMean = bdmnCtxSTN
+				preCtxSTN[i].o(j).bDurStd = bdsdCtxSTN
+				preCtxSTN[i].o(j).p = probCtxSTN.x(j)
+			}
+		}
+		if (i >= 10 && i < 40 && pnm.pc.gid_exists(i)) {
+			// update weights
+			for j=0, numStrGPe-1 {
+				preStrGPe[i-10].o(j).iMean = imnStrGPe
+				preStrGPe[i-10].o(j).iStd = isdStrGPe
+				preStrGPe[i-10].o(j).bMean = bmnStrGPe
+				preStrGPe[i-10].o(j).bStd = bsdStrGPe
+				preStrGPe[i-10].o(j).bDurMean = bdmnStrGPe
+				preStrGPe[i-10].o(j).bDurStd = bdsdStrGPe
+				preStrGPe[i-10].o(j).p = probStrGPe.x(j)
+			}
+		}
+		if (i >= 40 && i < 50 && pnm.pc.gid_exists(i)) {
+			// update weights
+			for j=0, numStrGPi-1 {
+				preStrGPi[i-40].o(j).iMean = imnStrGPi
+				preStrGPi[i-40].o(j).iStd = isdStrGPi
+				preStrGPi[i-40].o(j).bMean = bmnStrGPi
+				preStrGPi[i-40].o(j).bStd = bsdStrGPi
+				preStrGPi[i-40].o(j).bDurMean = bdmnStrGPi
+				preStrGPi[i-40].o(j).bDurStd = bdsdStrGPi
+				preStrGPi[i-40].o(j).p = probStrGPi.x(j)
+			}
+		}
+	}
+
+	for k=0, ncCtxSTN.count-1 {
+		ncCtxSTN.o(k).weight = gDA_CtxSTN*gmaxCtxSTN/numCtxSTN
+		ncCtxSTN.o(k).delay = delCtxSTN
+	}
+
+	for k=0, ncStrGPe.count-1 {
+		ncStrGPe.o(k).weight = gDA_StrGPe*gmaxStrGPe/numStrGPe
+		ncStrGPe.o(k).delay = delStrGPe
+	}
+
+	for k=0, ncStrGPi.count-1 {
+		ncStrGPi.o(k).weight = gDA_StrGPi*gmaxStrGPi/numStrGPi
+		ncStrGPi.o(k).delay = delStrGPi
+	}
+
+}
+
+
+//----------------------------------------------------------------------------
+proc setMPTPinput() {local i
+//---------------
+
+probCtxSTN.fill(.25)
+probStrGPe.fill(.25)
+probStrGPi.fill(.25)
+
+imnCtxSTN = 75
+imnStrGPe = 75
+imnStrGPi = 150
+
+gDA_CtxSTN = 1.25
+gDA_StrGPe = 1.25
+gDA_StrGPi = 1
+gDA_STNGPe = 1.25
+gDA_STNGPi = 1
+gDA_GPeSTN = 1.25
+gDA_GPeGPe = 1
+gDA_GPeGPi = 1.25
+
+INPupdateWeights()
+CONupdateWeights()
+
+}
+
+
+//-----------------------------------------------------------------------------------------------------
+proc setNORMALinput() {local i
+//---------------
+
+probCtxSTN.fill(.05)
+probStrGPe.fill(.05)
+probStrGPi.fill(.05)
+
+imnCtxSTN = 100
+imnStrGPe = 100
+imnStrGPi = 100
+
+gDA_CtxSTN = 1
+gDA_StrGPe = 1
+gDA_StrGPi = 1
+gDA_STNGPe = 2
+gDA_STNGPi = 1
+gDA_GPeSTN = 1
+gDA_GPeGPe = 1
+gDA_GPeGPi = 1
+
+INPupdateWeights()
+CONupdateWeights()
+
+}
+
+
+//-----------------------------------------------------------------------------------------------------
+proc setPROBinput() {local i
+//---------------
+
+probCtxSTN.fill($1)
+probStrGPe.fill($1)
+probStrGPi.fill($1)
+
+INPupdateWeights()
+
+
+}
+
+
+//----------------------------------------------------------------------------
+// Call setup functions when .hoc file is loaded
+//----------------------------------------------------------------------------
+
+INPconnectNet()
+INPupdateWeights()
