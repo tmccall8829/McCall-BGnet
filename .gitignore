@@ -1,0 +1,5 @@
+*.py
+mptp*
+normal*
+.DS_Store
+x86_64
